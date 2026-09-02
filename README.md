@@ -28,11 +28,12 @@ The library is designed primarily for projects based on:
 
 ## Dependencies
 
-The following libraries are required:
+The following libraries are required (tested versions bellow):
 
 * DabbleESP32 >= 1.5.1
 * Adafruit PWM Servo Driver Library >= 3.0.3
 * SparkFun BNO08x Cortex Based IMU >= 1.0.6
+* PubSubClient >= 2.8.0
 
 These dependencies are installed automatically when PenguinLib is installed through the Arduino Library Manager.
 
@@ -75,6 +76,10 @@ Demonstrates an interactive robot using:
 
 The robot can detect interaction through its touch sensor and respond with movement and audio.
 
+### 06 - Hexapod controlled using MQTT protocol
+
+Demonstrates basic control of a complete hexapod robot using MQTT protocol instead of Dabble app.
+
 ## Installation
 
 ### Arduino Library Manager
@@ -104,12 +109,6 @@ Documents/Arduino/libraries/PenguinLib
 Restart the Arduino IDE after installation.
 
 ## Basic Usage
-
-Include the library in your sketch:
-
-```cpp
-#include <PenguinLib.h>
-```
 
 See the examples included with the library for complete applications.
 
