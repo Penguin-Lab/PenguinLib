@@ -1,8 +1,6 @@
-#define CUSTOM_SETTINGS
-#define INCLUDE_GAMEPAD_MODULE
-#include <DabbleESP32.h>
-#include <Wire.h>
 #include <LeggedRobot.h>
+#define USE_DABBLE
+#include <penguinUtils.h>
 
 const float L1 = 5.325, L2 = 10.4, L3 = 14.565;
 
@@ -30,13 +28,15 @@ RobotLeg* hexapodLegs[6] = {&LeftFoward, &LeftMiddle, &LeftBackward, &RightFowar
 LegConfig hexapodConfigs[6] = {LeftFowardConfig, LeftMiddleConfig, LeftBackwardConfig, RightFowardConfig, RightMiddleConfig, RightBackwardConfig};
 
 LeggedRobot robot(hexapodLegs, hexapodConfigs, 6);
+comDabble com("Robot");
+JoystickData joystickData = com.joystickData;
 
 void TaskRobot(void *pvParameters);
 void TaskCommunication(void *pvParameters);
  
 void setup() {
   Serial.begin(38400);
-  Dabble.begin("Robot");
+  com.begin();
   Serial.println("Robot started!");
 
   // Config PCA9685
@@ -50,17 +50,12 @@ void setup() {
 
 void loop(){}
 
-// State machine variables
-int state = 11;
-int angleJoystick = 90;
-int mode = 0; // 0 - Omnidirecional, 1 - Rotacional
-
 void TaskRobot(void *pvParameters) {
   int k = 0;
   int totalPoints = RobotLeg::TOTAL_POINTS;
   for (;;) {
     // High handshake
-    if(state == 1){
+    if(joystickData.state == 1){
         totalPoints = 50;
         int3 angles = {-10,-10,0};
         // robot.handShake(k,3,totalPoints);
@@ -74,7 +69,7 @@ void TaskRobot(void *pvParameters) {
         vTaskDelay(pdMS_TO_TICKS(2));
     }
     // Wiggle
-    else if(state == 2){
+    else if(joystickData.state == 2){
         int3 angles = robot.circularRollPitchYaw(k, 10);
         robot.bodyTilt(angles);
         #if DEBUG_SIMULADOR
@@ -89,13 +84,13 @@ void TaskRobot(void *pvParameters) {
         vTaskDelay(pdMS_TO_TICKS(20));
     }
     // mode 0 - Omnidirectional walk, mode 1 - Circular walk, mode 2 - Circular walk with IMU reaction
-    else if(state == 3){
-      float angle = joystickToInt(angleJoystick,5);
-      if (mode == 0){
+    else if(joystickData.state == 3){
+      float angle = joystickToInt(joystickData.angle,5);
+      if (joystickData.mode == 0){
         float angle_rad = angle*M_PI/180.0;
         k = robot.walk(k,angle_rad);
       }
-      else if (mode == 1){
+      else if (joystickData.mode == 1){
         k = robot.circularWalk(k,angle);
       }
       else{
@@ -108,22 +103,22 @@ void TaskRobot(void *pvParameters) {
       vTaskDelay(pdMS_TO_TICKS(20));
     }
     // Start robot
-    else if(state == 9){
+    else if(joystickData.state == 9){
         robot.start();
-        state = 0;
+        joystickData.state = 0;
         vTaskDelay(pdMS_TO_TICKS(500));
     }
     // Shutdown robot
-    else if(state == 10){
+    else if(joystickData.state == 10){
         robot.shutdown();
-        state = 11;
+        joystickData.state = 11;
         vTaskDelay(pdMS_TO_TICKS(1));
     }
     // Idle position
-    else if(state == 0){
+    else if(joystickData.state == 0){
       k = 0;
       // Idle reacting to IMU
-      if (mode == 2){
+      if (joystickData.mode == 2){
         int3 anglesint3 = int3(robot.poseAngles);
         robot.idle(anglesint3);
       }
@@ -144,50 +139,7 @@ void TaskRobot(void *pvParameters) {
 
 void TaskCommunication(void *pvParameters) {
   for (;;) {
-    Dabble.processInput();
-    // Commands after start
-    if (state != 11){
-      // Circular walk mode
-      if (GamePad.isRightPressed()||GamePad.isLeftPressed()||GamePad.isCrossPressed()){
-        mode = 1;
-      }
-      // Omnidirectional walk mode
-      if (GamePad.isUpPressed()||GamePad.isDownPressed()){
-        mode = 0;
-      }
-      // Tilt reaction with IMU mode
-      if (GamePad.isSquarePressed()){
-        mode = 2;
-      }
-      // High handshake while pressing
-      if (GamePad.isCirclePressed()){
-        state = 1;
-      }
-      // Wiggle while pressing
-      else if(GamePad.isTrianglePressed()){
-        state = 2;
-      }
-      // Walk
-      else if(GamePad.getRadius() > 2){
-        angleJoystick = GamePad.getAngle();
-        state = 3;
-      }
-      // Shutdown robot
-      else if(GamePad.isSelectPressed()){
-        state = 10;
-      }
-      // Idle
-      else{
-        state = 0;
-      }
-    }
-    // Before start
-    else{
-      // Start command
-      if(GamePad.isStartPressed()){
-        state = 9;
-      }
-    }
+    joystickData = com.getJoystick();
     vTaskDelay(pdMS_TO_TICKS(20));   
   }
 }

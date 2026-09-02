@@ -1,9 +1,6 @@
 #include <LeggedRobot.h>
-#define USE_DABBLE
+#define USE_MQTT
 #include <penguinUtils.h>
-
-// Imu
-bnoImu imu(0x4B,15.0);
 
 const float L1 = 5.325, L2 = 10.4, L3 = 14.565;
 
@@ -11,51 +8,52 @@ Adafruit_PWMServoDriver pwmL = Adafruit_PWMServoDriver(0x40);
 Adafruit_PWMServoDriver pwmR = Adafruit_PWMServoDriver(0x41);
 
 // Criacao das patas e do hexapod
-RobotLeg LeftFoward    = {&pwmL, 12, 13, 14, 315, 747, 332, 759, 495, 923, L1, L2, L3};
-RobotLeg LeftMiddle    = {&pwmL,  4,  5,  6, 315, 747, 332, 759, 495, 923, L1, L2, L3};
-RobotLeg LeftBackward  = {&pwmL,  0,  1,  2, 315, 747, 332, 759, 495, 923, L1, L2, L3};
+RobotLeg LeftFoward    = {&pwmL, 12, 13, 14, 315, 747, 332, -96, 495, 923, L1, L2, L3};
+RobotLeg LeftMiddle    = {&pwmL,  4,  5,  6, 315, 747, 332, -96, 495, 923, L1, L2, L3};
+RobotLeg LeftBackward  = {&pwmL,  0,  1,  2, 315, 747, 332, -96, 495, 923, L1, L2, L3};
 
-RobotLeg RightFoward   = {&pwmR,  0,  1,  2, 315, 747, 332, 759, 495, 923, L1, L2, L3};
-RobotLeg RightMiddle   = {&pwmR,  8,  9, 10, 315, 747, 332, 759, 495, 923, L1, L2, L3};
-RobotLeg RightBackward = {&pwmR, 12, 13, 14, 315, 747, 332, 759, 495, 923, L1, L2, L3};
+RobotLeg RightFoward   = {&pwmR,  0,  1,  2, 315, 747, 332, -96, 495, 923, L1, L2, L3};
+RobotLeg RightMiddle   = {&pwmR,  8,  9, 10, 327, 761, 338, -92, 526, 956, L1, L2, L3};
+RobotLeg RightBackward = {&pwmR, 12, 13, 14, 335, 769, 341, -87, 524, 956, L1, L2, L3};
 
 LegConfig LeftFowardConfig    = {floatxyz{9.30,5.55,0.00}, int3{-45,26,-100}, 0, 0};
 LegConfig LeftMiddleConfig    = {floatxyz{0.00,6.50,0.00}, int3{  0,26,-100}, RobotLeg::HALF_POINTS, 0};
 LegConfig LeftBackwardConfig  = {floatxyz{-9.5,5.50,0.00}, int3{ 45,26,-100}, 0, 0};
 
-LegConfig RightFowardConfig   = {floatxyz{9.30,-5.55,0.0}, int3{135,26,-100}, RobotLeg::HALF_POINTS, M_PI};
+LegConfig RightFowardConfig   = {floatxyz{9.30,-5.55,0.0}, int3{225,26,-100}, RobotLeg::HALF_POINTS, M_PI};
 LegConfig RightMiddleConfig   = {floatxyz{0.00,-6.50,0.0}, int3{180,26,-100}, 0, M_PI};
-LegConfig RightBackwardConfig = {floatxyz{-9.5,-5.50,0.0}, int3{225,26,-100}, RobotLeg::HALF_POINTS, M_PI};
+LegConfig RightBackwardConfig = {floatxyz{-9.5,-5.50,0.0}, int3{135,26,-100}, RobotLeg::HALF_POINTS, M_PI};
 
 RobotLeg* hexapodLegs[6] = {&LeftFoward, &LeftMiddle, &LeftBackward, &RightFoward, &RightMiddle, &RightBackward};
 LegConfig hexapodConfigs[6] = {LeftFowardConfig, LeftMiddleConfig, LeftBackwardConfig, RightFowardConfig, RightMiddleConfig, RightBackwardConfig};
 
 LeggedRobot robot(hexapodLegs, hexapodConfigs, 6);
-comDabble com("Robot");
+comMqtt com(
+    "SEU-WIFI",
+    "SUA-SENHA",
+    "10.10.2.211",
+    30001,
+    "guest",
+    "guest",
+    "leggedrobot/vel"
+);
 JoystickData joystickData = com.joystickData;
 
 void TaskRobot(void *pvParameters);
 void TaskCommunication(void *pvParameters);
-void TaskIMU(void *pvParameters);
  
 void setup() {
   Serial.begin(38400);
   com.begin();
   Serial.println("Robot started!");
 
-  Wire.begin(21, 22);
-
   // Config PCA9685
   pwmL.begin(); pwmL.setPWMFreq(50);
   pwmR.begin(); pwmR.setPWMFreq(50);
 
-  // Start BNO080 at 0x4B
-  imu.start();
-
   delay(2000);
   xTaskCreate(TaskRobot, "robot", 4096, NULL, 1, NULL);
   xTaskCreate(TaskCommunication, "communication", 4096, NULL, 1, NULL);
-  xTaskCreate(TaskIMU, "imu", 4096, NULL, 1, NULL);
 }
 
 void loop(){}
@@ -151,21 +149,5 @@ void TaskCommunication(void *pvParameters) {
   for (;;) {
     joystickData = com.getJoystick();
     vTaskDelay(pdMS_TO_TICKS(20));   
-  }
-}
-
-void TaskIMU(void *pvParameters) {
-  for (;;) {
-    // Modes without IMU reaction
-    if (joystickData.mode == 0 || joystickData.mode == 1){
-        robot.poseAngles = {0.0,0.0,0.0};
-    }
-    else{
-      // int3 angles = {roll,pitch,yaw};
-      if (imu.getEvent()) {
-        robot.poseAngles = imu.getPose(robot.poseAngles);
-      }
-    }
-    vTaskDelay(pdMS_TO_TICKS(20));
   }
 }

@@ -1,18 +1,16 @@
-#define CUSTOM_SETTINGS
-#define INCLUDE_GAMEPAD_MODULE
-#include <DabbleESP32.h>
-#include <Wire.h>
+#define USE_DABBLE
 #include <penguinUtils.h>
 
 dfPlayer dfplayer(16,17);
 touchSensor touchsensor(T3, 40, 3);
+comDabble com("Robot");
 
 void TaskComunication(void *pvParameters);
 void TaskSensor(void *pvParameters);
 
 void setup() {
   Serial.begin(38400);
-  Dabble.begin("Robot");
+  com.begin();
 
   // Volume
   dfplayer.setVolume(30);
@@ -28,8 +26,9 @@ void loop(){
 
 void TaskComunication(void *pvParameters) {
   for (;;) {
-    Dabble.processInput();
-    if (GamePad.isSquarePressed()) {
+    com.update();
+    GamepadState pad = com.readGamepad();
+    if (pad.square) {
       dfplayer.playTrack(1);
     }
     vTaskDelay(pdMS_TO_TICKS(20));   

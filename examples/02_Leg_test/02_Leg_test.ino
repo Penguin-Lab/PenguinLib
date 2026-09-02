@@ -1,6 +1,3 @@
-#define CUSTOM_SETTINGS
-#define INCLUDE_GAMEPAD_MODULE
-#include <DabbleESP32.h>
 #include <Wire.h>
 #include <RobotLeg.h>
 

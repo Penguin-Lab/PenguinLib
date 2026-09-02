@@ -2,6 +2,7 @@
 #define LEGGEDROBOT_H
 
 #include <Arduino.h>
+#include "MathTypes.h"
 #include "RobotLeg.h"
 
 #define MAX_LEGS 6
