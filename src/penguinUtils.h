@@ -57,10 +57,14 @@ private:
   uint8_t address;
   float maxAngle;
 
+  float rollOffset;
+  float pitchOffset;
+
 public:
   bnoImu(uint8_t address, float maxAngle);
 
   void start();
+  void calibrate(int samples = 30);
   bool getEvent();
   float3 getPose(float3 lastPose);
 };
@@ -227,6 +231,29 @@ bool touchSensor::affection(){
 
 // BNO08X IMU
 bnoImu::bnoImu(uint8_t address, float maxAngle) : address(address), maxAngle(maxAngle) {
+  rollOffset = 0.0f;
+  pitchOffset = 0.0f;
+}
+
+void bnoImu::calibrate(int samples){
+    float sumRoll = 0.0f;
+    float sumPitch = 0.0f;
+    int count = 0;
+
+    while (count < samples){
+        if (myImu.getSensorEvent() && myImu.getSensorEventID() == SENSOR_REPORTID_ROTATION_VECTOR){
+            sumRoll  += myImu.getRoll()  * 180.0f / PI;
+            sumPitch += myImu.getPitch() * 180.0f / PI;
+            count++;
+        }
+        delay(20);
+    }
+
+    rollOffset  = sumRoll /samples;
+    pitchOffset = sumPitch/samples;
+
+    Serial.print("IMU calibrated. rollOffset: "); Serial.print(rollOffset);
+    Serial.print("  pitchOffset: "); Serial.println(pitchOffset);
 }
 
 void bnoImu::start(){

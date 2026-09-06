@@ -41,7 +41,7 @@ public:
 
     // Movement
     int walk(int k, float angle_rad);
-    floatxyz circularTrajetory(int legIdx, floatxyz currentPosition, float stepLength, float totalAngle_rad, LegConfig config);
+    floatxyz circularTrajetory(floatxyz footPosition, floatxyz currentPosition, float stepLength, float totalAngle_rad, LegConfig config);
     int circularWalk(int k, float angle);
     int reactCircularWalk(int k, float angle, int3 angles);
 

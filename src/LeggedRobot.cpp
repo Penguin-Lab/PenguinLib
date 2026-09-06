@@ -13,7 +13,7 @@ floatxyz coordLegToBody(floatxyz legPosition, float installedAngle_rad, floatxyz
 }
 
 floatxyz coordBodyToLeg(floatxyz bodyPosition, float installedAngle_rad, floatxyz coxa){
-    floatxyz xyz = bodyPosition - coxa;
+    floatxyz xyz;
     xyz.x = cos(-installedAngle_rad)*(bodyPosition.x - coxa.x) - sin(-installedAngle_rad)*(bodyPosition.y - coxa.y);
     xyz.y = sin(-installedAngle_rad)*(bodyPosition.x - coxa.x) + cos(-installedAngle_rad)*(bodyPosition.y - coxa.y);
     xyz.z = bodyPosition.z - coxa.z;
@@ -205,20 +205,38 @@ int LeggedRobot::walk(int k, float angle_rad){
     }
 }
 
-floatxyz LeggedRobot::circularTrajetory(int legIdx, floatxyz currentPosition, float stepLength, float totalAngle_rad, LegConfig config){
-    // Mapping of linear trajectory to curve (stepLength = P3[0] - footPosition.x)
-    float d_alpha = (totalAngle_rad/2.0)*(currentPosition.x - robotlegs[legIdx]->footPosition.x)/(stepLength);
+floatxyz LeggedRobot::circularTrajetory(floatxyz footPosition, floatxyz currentPosition, float stepLength, float totalAngle_rad, LegConfig config){
     // Translation of foot position to body coordinates
-    floatxyz xyz = coordLegToBody(robotlegs[legIdx]->footPosition, config.installedAngle_rad, config.coxa);
+    floatxyz xyz = coordLegToBody(footPosition, config.installedAngle_rad, config.coxa);
+    floatxyz xyzCurr = coordLegToBody(currentPosition, config.installedAngle_rad, config.coxa);
+    // Mapping of linear trajectory to curve (stepLength = P3[0] - footPosition.x)
+    float d_alpha = (totalAngle_rad/2.0)*(xyzCurr.x - xyz.x)/(stepLength);
     float r = sqrt(xyz.x*xyz.x + xyz.y*xyz.y);
     float alpha = atan2(xyz.x,xyz.y);
-    float n_alpha = alpha + d_alpha;
+    float n_alpha = alpha - d_alpha;
     // Rotation and translation from body back to leg coordinates
     xyz.x = r*sin(n_alpha);
     xyz.y = r*cos(n_alpha);
-    xyz.z = xyz.z;
-    return coordBodyToLeg(xyz, config.installedAngle_rad, config.coxa);
+    xyz = coordBodyToLeg(xyz, config.installedAngle_rad, config.coxa);
+    xyz.z = currentPosition.z;
+    return xyz;
 }
+
+// floatxyz LeggedRobot::circularTrajetory(floatxyz footPosition, floatxyz currentPosition, float stepLength, float totalAngle_rad, LegConfig config){
+//     // Mapping of linear trajectory to curve (stepLength = P3[0] - footPosition.x)
+//     float d_alpha = (totalAngle_rad/2.0)*(currentPosition.x - footPosition.x)/(stepLength);
+//     // Translation of foot position to body coordinates
+//     floatxyz xyz = coordLegToBody(footPosition, config.installedAngle_rad, config.coxa);
+//     float r = sqrt(xyz.x*xyz.x + xyz.y*xyz.y);
+//     float alpha = atan2(xyz.x,xyz.y);
+//     float n_alpha = alpha + d_alpha;
+//     // Rotation and translation from body back to leg coordinates
+//     xyz.x = r*sin(n_alpha);
+//     xyz.y = r*cos(n_alpha);
+//     xyz = coordBodyToLeg(xyz, config.installedAngle_rad, config.coxa);
+//     xyz.z = currentPosition.z;
+//     return xyz;
+// }
 
 int LeggedRobot::circularWalk(int k, float angle) {
     float angle_abs = abs(angle);
@@ -239,16 +257,26 @@ int LeggedRobot::circularWalk(int k, float angle) {
         angle_max = -angle_max;
     // Walk foward or backwards rotating
     if (v_mult == 1.0 && w_mult == 1.0) {
-        float percentual = angle_abs/180.0;
+        float percentual;
+        if (angle_abs <= 90.0) {
+            percentual = angle_abs/90.0;
+        }
+        else {
+            percentual = (180.0 - angle_abs)/90.0;
+        }
         w_mult = percentual;
         v_mult = 1.0 - percentual;
     }
+    Serial.print("w: ");
+    Serial.println(w_mult);
+    Serial.print("v: ");
+    Serial.println(v_mult);
 
     // Calculate and combine linear and circular tranjectory movement
     int3 angles[MAX_LEGS];
     for (int i = 0; i < numLegs; i++) {
         floatxyz linear = robotlegs[i]->linearTrajetory(robotlegs[i]->footPosition, k, config[i].offset, - config[i].installedAngle_rad);
-        floatxyz circular = circularTrajetory(i, linear, robotlegs[i]->P3[0] - robotlegs[i]->footPosition.x, angle_max, config[i]);
+        floatxyz circular = circularTrajetory(robotlegs[i]->footPosition, linear, robotlegs[i]->P3[0] - robotlegs[i]->footPosition.x, angle_max, config[i]);
         floatxyz xyz = (linear*v_mult + circular*w_mult)/(v_mult + w_mult);
         angles[i] = robotlegs[i]->inverseKinematics(xyz);
     }
@@ -287,7 +315,13 @@ int LeggedRobot::reactCircularWalk(int k, float angle, int3 angles){
         angle_max = -angle_max;
     // Walk foward or backwards rotating
     if (v_mult == 1.0 && w_mult == 1.0) {
-        float percentual = angle_abs/180.0;
+        float percentual;
+        if (angle_abs <= 90.0) {
+            percentual = angle_abs/90.0;
+        }
+        else {
+            percentual = (180.0 - angle_abs)/90.0;
+        }
         w_mult = percentual;
         v_mult = 1.0 - percentual;
     }
@@ -296,12 +330,12 @@ int LeggedRobot::reactCircularWalk(int k, float angle, int3 angles){
     floatxyz xyz[MAX_LEGS];
     for (int i = 0; i < numLegs; i++) {
         floatxyz linear = robotlegs[i]->linearTrajetory(robotlegs[i]->footPosition, k, config[i].offset, - config[i].installedAngle_rad);
-        floatxyz circular = circularTrajetory(i, linear, robotlegs[i]->P3[0] - robotlegs[i]->footPosition.x, angle_max, config[i]);
+        floatxyz circular = circularTrajetory(robotlegs[i]->footPosition, linear, robotlegs[i]->P3[0] - robotlegs[i]->footPosition.x, angle_max, config[i]);
         xyz[i] = (linear*v_mult + circular*w_mult)/(v_mult + w_mult);
     }
     
     // Reaction to body tilt
-    int3 anglesRot = angles*(-1);
+    int3 anglesRot = angles;
     
     int3 anglesReact[MAX_LEGS];
     for (int i = 0; i < numLegs; i++) {
@@ -335,7 +369,7 @@ int LeggedRobot::reactCircularWalk(int k, float angle, int3 angles){
 
 void LeggedRobot::bodyTilt(int3 angles){
     // Reaction to body tilt
-    int3 anglesRot = angles*(-1);
+    int3 anglesRot = angles;
     
     int3 anglesReact[MAX_LEGS];
     for (int i = 0; i < numLegs; i++) {
@@ -436,7 +470,7 @@ void LeggedRobot::idle(){
 
 void LeggedRobot::idle(int3 angles){ // Same as bodyTilt but moving softly
     // Reaction to body tilt
-    int3 anglesRot = angles*(-1);
+    int3 anglesRot = angles;
     
     int3 anglesReact[MAX_LEGS];
     for (int i = 0; i < numLegs; i++) {

@@ -11,28 +11,27 @@ Adafruit_PWMServoDriver pwmL = Adafruit_PWMServoDriver(0x40);
 Adafruit_PWMServoDriver pwmR = Adafruit_PWMServoDriver(0x41);
 
 // Criacao das patas e do hexapod
-RobotLeg LeftFoward    = {&pwmL, 12, 13, 14, 315, 747, 332, 759, 495, 923, L1, L2, L3};
-RobotLeg LeftMiddle    = {&pwmL,  4,  5,  6, 315, 747, 332, 759, 495, 923, L1, L2, L3};
-RobotLeg LeftBackward  = {&pwmL,  0,  1,  2, 315, 747, 332, 759, 495, 923, L1, L2, L3};
+RobotLeg LeftFoward    = {&pwmL, 12, 13, 14, 341, 819, 336, 810, 162, -326, L1, L2, L3};
+RobotLeg LeftMiddle    = {&pwmL,  4,  5,  6, 356, 844, 347, 817, 149, -313, L1, L2, L3};
+RobotLeg LeftBackward  = {&pwmL,  0,  1,  2, 346, 816, 348, 814, 162, -320, L1, L2, L3};
 
-RobotLeg RightFoward   = {&pwmR,  0,  1,  2, 315, 747, 332, 759, 495, 923, L1, L2, L3};
-RobotLeg RightMiddle   = {&pwmR,  8,  9, 10, 315, 747, 332, 759, 495, 923, L1, L2, L3};
-RobotLeg RightBackward = {&pwmR, 12, 13, 14, 315, 747, 332, 759, 495, 923, L1, L2, L3};
+RobotLeg RightFoward   = {&pwmR,  3,  2,  1, 315, 747, 332, -96, 495, 923, L1, L2, L3};
+RobotLeg RightMiddle   = {&pwmR, 11, 10,  9, 327, 761, 338, -92, 526, 956, L1, L2, L3};
+RobotLeg RightBackward = {&pwmR, 15, 14, 13, 335, 769, 341, -87, 524, 956, L1, L2, L3};
 
 LegConfig LeftFowardConfig    = {floatxyz{9.30,5.55,0.00}, int3{-45,26,-100}, 0, 0};
 LegConfig LeftMiddleConfig    = {floatxyz{0.00,6.50,0.00}, int3{  0,26,-100}, RobotLeg::HALF_POINTS, 0};
 LegConfig LeftBackwardConfig  = {floatxyz{-9.5,5.50,0.00}, int3{ 45,26,-100}, 0, 0};
 
-LegConfig RightFowardConfig   = {floatxyz{9.30,-5.55,0.0}, int3{135,26,-100}, RobotLeg::HALF_POINTS, M_PI};
+LegConfig RightFowardConfig   = {floatxyz{9.30,-5.55,0.0}, int3{225,26,-100}, RobotLeg::HALF_POINTS, M_PI};
 LegConfig RightMiddleConfig   = {floatxyz{0.00,-6.50,0.0}, int3{180,26,-100}, 0, M_PI};
-LegConfig RightBackwardConfig = {floatxyz{-9.5,-5.50,0.0}, int3{225,26,-100}, RobotLeg::HALF_POINTS, M_PI};
+LegConfig RightBackwardConfig = {floatxyz{-9.5,-5.50,0.0}, int3{135,26,-100}, RobotLeg::HALF_POINTS, M_PI};
 
 RobotLeg* hexapodLegs[6] = {&LeftFoward, &LeftMiddle, &LeftBackward, &RightFoward, &RightMiddle, &RightBackward};
 LegConfig hexapodConfigs[6] = {LeftFowardConfig, LeftMiddleConfig, LeftBackwardConfig, RightFowardConfig, RightMiddleConfig, RightBackwardConfig};
 
 LeggedRobot robot(hexapodLegs, hexapodConfigs, 6);
 comDabble com("Robot");
-JoystickData joystickData = com.joystickData;
 
 void TaskRobot(void *pvParameters);
 void TaskCommunication(void *pvParameters);
@@ -51,6 +50,8 @@ void setup() {
 
   // Start BNO080 at 0x4B
   imu.start();
+  delay(300);
+  imu.calibrate();
 
   delay(2000);
   xTaskCreate(TaskRobot, "robot", 4096, NULL, 1, NULL);
@@ -65,7 +66,7 @@ void TaskRobot(void *pvParameters) {
   int totalPoints = RobotLeg::TOTAL_POINTS;
   for (;;) {
     // High handshake
-    if(joystickData.state == 1){
+    if(com.joystickData.state == 1){
         totalPoints = 50;
         int3 angles = {-10,-10,0};
         // robot.handShake(k,3,totalPoints);
@@ -79,7 +80,7 @@ void TaskRobot(void *pvParameters) {
         vTaskDelay(pdMS_TO_TICKS(2));
     }
     // Wiggle
-    else if(joystickData.state == 2){
+    else if(com.joystickData.state == 2){
         int3 angles = robot.circularRollPitchYaw(k, 10);
         robot.bodyTilt(angles);
         #if DEBUG_SIMULADOR
@@ -94,13 +95,13 @@ void TaskRobot(void *pvParameters) {
         vTaskDelay(pdMS_TO_TICKS(20));
     }
     // mode 0 - Omnidirectional walk, mode 1 - Circular walk, mode 2 - Circular walk with IMU reaction
-    else if(joystickData.state == 3){
-      float angle = joystickToInt(joystickData.angle,5);
-      if (joystickData.mode == 0){
+    else if(com.joystickData.state == 3){
+      float angle = joystickToInt(com.joystickData.angle,5);
+      if (com.joystickData.mode == 0){
         float angle_rad = angle*M_PI/180.0;
         k = robot.walk(k,angle_rad);
       }
-      else if (joystickData.mode == 1){
+      else if (com.joystickData.mode == 1){
         k = robot.circularWalk(k,angle);
       }
       else{
@@ -113,22 +114,22 @@ void TaskRobot(void *pvParameters) {
       vTaskDelay(pdMS_TO_TICKS(20));
     }
     // Start robot
-    else if(joystickData.state == 9){
+    else if(com.joystickData.state == 9){
         robot.start();
-        joystickData.state = 0;
+        com.joystickData.state = 0;
         vTaskDelay(pdMS_TO_TICKS(500));
     }
     // Shutdown robot
-    else if(joystickData.state == 10){
+    else if(com.joystickData.state == 10){
         robot.shutdown();
-        joystickData.state = 11;
+        com.joystickData.state = 11;
         vTaskDelay(pdMS_TO_TICKS(1));
     }
     // Idle position
-    else if(joystickData.state == 0){
+    else if(com.joystickData.state == 0){
       k = 0;
       // Idle reacting to IMU
-      if (joystickData.mode == 2){
+      if (com.joystickData.mode == 2){
         int3 anglesint3 = int3(robot.poseAngles);
         robot.idle(anglesint3);
       }
@@ -149,7 +150,7 @@ void TaskRobot(void *pvParameters) {
 
 void TaskCommunication(void *pvParameters) {
   for (;;) {
-    joystickData = com.getJoystick();
+    com.getJoystick();
     vTaskDelay(pdMS_TO_TICKS(20));   
   }
 }
@@ -157,7 +158,7 @@ void TaskCommunication(void *pvParameters) {
 void TaskIMU(void *pvParameters) {
   for (;;) {
     // Modes without IMU reaction
-    if (joystickData.mode == 0 || joystickData.mode == 1){
+    if (com.joystickData.mode == 0 || com.joystickData.mode == 1){
         robot.poseAngles = {0.0,0.0,0.0};
     }
     else{
