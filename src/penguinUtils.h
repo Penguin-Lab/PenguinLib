@@ -240,16 +240,15 @@ void bnoImu::calibrate(int samples){
     float sumPitch = 0.0f;
     int count = 0;
 
-    while (count < samples){
+    while (count<samples){
         if (myImu.getSensorEvent() && myImu.getSensorEventID() == SENSOR_REPORTID_ROTATION_VECTOR){
-            sumRoll  += myImu.getRoll()  * 180.0f / PI;
-            sumPitch += myImu.getPitch() * 180.0f / PI;
+            sumRoll  += myImu.getRoll()*180.0f/PI;
+            sumPitch += myImu.getPitch()*180.0f/PI;
             count++;
         }
         delay(20);
     }
-
-    rollOffset  = sumRoll /samples;
+    rollOffset  = sumRoll/samples;
     pitchOffset = sumPitch/samples;
 
     Serial.print("IMU calibrated. rollOffset: "); Serial.print(rollOffset);
