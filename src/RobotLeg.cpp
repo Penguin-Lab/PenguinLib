@@ -114,10 +114,10 @@ bool RobotLeg::moveSoft(int angCoxa, int angFemur, int angTibia, int step) {
     return stopped;
 }
 
-void RobotLeg::moveToInitialPosition() {
+bool RobotLeg::moveToInitialPosition() {
     int3 angles = inverseKinematics(this->footPosition);
     // this->move(angles.coxa, angles.femur, angles.tibia);
-    this->moveSoft(angles.coxa, angles.femur, angles.tibia, 1);
+    return this->moveSoft(angles.coxa, angles.femur, angles.tibia, 1);
 }
 
 void RobotLeg::shutdown() {
@@ -158,21 +158,80 @@ int3 RobotLeg::inverseKinematics(floatxyz xyz){
 // Trajectories
 // =====================================================
 
+// floatxyz RobotLeg::linearTrajetory(floatxyz footPosition, int k, int offset, float angle_rad){
+//     floatxyz xyz;
+//     int kn = (k + offset) % TOTAL_POINTS;
+//     if (kn < HALF_POINTS){
+//       float t = float(kn)/(HALF_POINTS-1);
+//       float u = 1 - t;
+//       xyz.x = footPosition.x + cos(angle_rad)*(-footPosition.x + u*u*u*this->P0[0] + 3*u*u*t*this->P1[0] + 3*u*t*t*this->P2[0] + t*t*t*this->P3[0]);
+//       xyz.y = footPosition.y + sin(angle_rad)*(-footPosition.x + u * u * u * this->P0[0] + 3*u*u*t*this->P1[0] + 3*u*t*t*this->P2[0] + t*t*t*this->P3[0]);
+//       xyz.z = u*u*u*this->P0[1] + 3*u*u*t*this->P1[1] + 3*u*t*t*this->P2[1] + t*t*t*this->P3[1];
+//     }
+//     else{
+//       xyz.x = footPosition.x + cos(angle_rad)*(-footPosition.x + this->P3[0] + (this->P0[0] - this->P3[0])*(float(kn - HALF_POINTS)/(HALF_POINTS - 1)));
+//       xyz.y = footPosition.y + sin(angle_rad)*(-footPosition.x + this->P3[0] + (this->P0[0] - this->P3[0])*(float(kn - HALF_POINTS)/(HALF_POINTS - 1)));
+//       xyz.z = footPosition.z;
+//     }
+//     return xyz;
+// }
+// floatxyz RobotLeg::linearTrajetory(floatxyz footPosition, int k, int offset, float angle_rad){
+//     floatxyz xyz;
+//     int kn = (k + offset) % TOTAL_POINTS;
+
+//     float dStart = P0[0] - footPosition.x;   // -stepLength/2
+//     float dEnd   = P3[0] - footPosition.x;   // +stepLength/2
+//     float d;
+
+//     if (kn < HALF_POINTS){
+//         // Swing: cicloide -> velocidade zero ao decolar e ao pousar
+//         float s = float(kn) / (HALF_POINTS - 1);
+//         float phase = 2.0f * M_PI * s;
+//         float sx = s - sinf(phase) / (2.0f * M_PI);
+//         d = dStart + (dEnd - dStart) * sx;
+//         xyz.z = footPosition.z + stepHeight * 0.5f * (1.0f - cosf(phase));
+//     } else {
+//         // Stance: igual ao original
+//         float s = float(kn - HALF_POINTS) / (HALF_POINTS - 1);
+//         d = dEnd + (dStart - dEnd) * s;
+//         xyz.z = footPosition.z;
+//     }
+
+//     xyz.x = footPosition.x + cosf(angle_rad) * d;
+//     xyz.y = footPosition.y + sinf(angle_rad) * d;
+//     return xyz;
+// }
 floatxyz RobotLeg::linearTrajetory(floatxyz footPosition, int k, int offset, float angle_rad){
     floatxyz xyz;
     int kn = (k + offset) % TOTAL_POINTS;
+
+    float dStart = P0[0] - footPosition.x;   // -stepLength/2
+    float dEnd   = P3[0] - footPosition.x;   // +stepLength/2
+    float d;
+
     if (kn < HALF_POINTS){
-      float t = float(kn)/(HALF_POINTS-1);
-      float u = 1 - t;
-      xyz.x = footPosition.x + cos(angle_rad)*(-footPosition.x + u*u*u*this->P0[0] + 3*u*u*t*this->P1[0] + 3*u*t*t*this->P2[0] + t*t*t*this->P3[0]);
-      xyz.y = footPosition.y + sin(angle_rad)*(-footPosition.x + u * u * u * this->P0[0] + 3*u*u*t*this->P1[0] + 3*u*t*t*this->P2[0] + t*t*t*this->P3[0]);
-      xyz.z = u*u*u*this->P0[1] + 3*u*u*t*this->P1[1] + 3*u*t*t*this->P2[1] + t*t*t*this->P3[1];
+        // Swing
+        float s = float(kn) / (HALF_POINTS - 1);
+        float phase = 2.0f * M_PI * s;
+        float sx = s - sinf(phase) / (2.0f * M_PI);
+        d = dStart + (dEnd - dStart) * sx;
+
+        // z assimétrico: decola rápido, pousa com velocidade zero
+        const float sPeak = 0.35f;
+        if (s < sPeak)
+            xyz.z = footPosition.z + stepHeight * sinf(0.5f * M_PI * s / sPeak);
+        else
+            xyz.z = footPosition.z + stepHeight * 0.5f * (1.0f + cosf(M_PI * (s - sPeak) / (1.0f - sPeak)));
     }
-    else{
-      xyz.x = footPosition.x + cos(angle_rad)*(-footPosition.x + this->P3[0] + (this->P0[0] - this->P3[0])*(float(kn - HALF_POINTS)/(HALF_POINTS - 1)));
-      xyz.y = footPosition.y + sin(angle_rad)*(-footPosition.x + this->P3[0] + (this->P0[0] - this->P3[0])*(float(kn - HALF_POINTS)/(HALF_POINTS - 1)));
-      xyz.z = footPosition.z;
+    else {
+        // Stance
+        float s = float(kn - HALF_POINTS) / (HALF_POINTS - 1);
+        d = dEnd + (dStart - dEnd) * s;
+        xyz.z = footPosition.z;
     }
+
+    xyz.x = footPosition.x + cosf(angle_rad) * d;
+    xyz.y = footPosition.y + sinf(angle_rad) * d;
     return xyz;
 }
 
@@ -181,10 +240,11 @@ floatxyz RobotLeg::legBezierTrajetory(floatxyz footPosition, int k, int offset, 
     int halfPoints = totalPoints/2;
     int kn = (k + offset) % totalPoints;
     float dx1 = dx/4.0;
-    float dx2 = dx/2.0;
+    float dx2 = dx/2.0;//dx*3.0/4.0
     float Px[4] = {footPosition.x, footPosition.x+dx1, footPosition.x+dx2, footPosition.x+dx};
-    float dy1 = dy/4.0;
-    float dy2 = dy/2.0;
+    float dy1 
+    = dy/4.0;
+    float dy2 = dy/2.0;//dy*3.0/4.0
     float Py[4] = {footPosition.y, footPosition.y+dy1, footPosition.y+dy2, footPosition.y+dy};
     float dz1 = dz/4.0;
     float dz2 = dz/2.0;
@@ -203,6 +263,36 @@ floatxyz RobotLeg::legBezierTrajetory(floatxyz footPosition, int k, int offset, 
     }
     return xyz;
 }
+
+// floatxyz RobotLeg::legZBezierTrajetory(floatxyz footPosition, int k, int offset, float dx, float dy, float dz, int totalPoints) {
+//     floatxyz xyz;
+//     int halfPoints = totalPoints/2;
+//     int kn = (k + offset) % totalPoints;
+//     float dx1 = dx/4.0;
+//     float dx2 = dx/2.0;
+//     float Px[4] = {footPosition.x, footPosition.x+dx1, footPosition.x+dx2, footPosition.x+dx};
+//     float dy1 = dy/4.0;
+//     float dy2 = dy/2.0;
+//     float Py[4] = {footPosition.y, footPosition.y+dy1, footPosition.y+dy2, footPosition.y+dy};
+//     float dz1 = dz/4.0;
+//     float dz2 = dz/2.0;
+//     float Pz[4] = {footPosition.z, footPosition.z+dz1+6.0, footPosition.z+dz2+10.0, footPosition.z+dz};
+//     if (kn < halfPoints){
+//       float t = float(kn)/(halfPoints-1);
+//       float u = 1 - t;
+//       xyz.x = u*u*u*Px[0] + 3*u*u*t*Px[1] + 3*u*t*t*Px[2] + t*t*t*Px[3];
+//       xyz.y = u*u*u*Py[0] + 3*u*u*t*Py[1] + 3*u*t*t*Py[2] + t*t*t*Py[3];
+//       xyz.z = u*u*u*Pz[0] + 3*u*u*t*Pz[1] + 3*u*t*t*Pz[2] + t*t*t*Pz[3];
+//       xyz.x = footPosition.x + this->P3[0] + (this->Px[0] - this->P3[0])*(float(kn - halfPoints)/(halfPoints - 1));
+      
+//     }
+//     else{
+//       xyz.x = Px[3];
+//       xyz.y = Py[3];
+//       xyz.z = Pz[3];
+//     }
+//     return xyz;
+// }
 
 void RobotLeg::updateBezier(float stepLength){
     float halfStepping = stepLength/2.0;

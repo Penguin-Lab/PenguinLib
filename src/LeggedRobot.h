@@ -22,6 +22,7 @@ struct LegConfig {
 floatxyz coordLegToBody(floatxyz legPosition, float installedAngle_rad, floatxyz coxa);
 floatxyz coordBodyToLeg(floatxyz bodyPosition, float installedAngle_rad, floatxyz coxa);
 floatxyz Rotation3d(floatxyz point, int3 angles);
+floatxyz Translation3d(floatxyz point, floatxyz dxyz);
 
 class LeggedRobot {
 
@@ -52,9 +53,11 @@ public:
     int3 circularRollPitchYaw(int k, int angle_max);
     void handShake(int k, int legIdx, int totalPoints);
     void highHandShake(int k, int legIdx, int3 angles, int totalPoints);
+    void roar(int3 angles, int legIdx);
+    void setRoarCallback(void (*callback)());
 
     // Idle position
-    void idle();
+    bool idle();
     void idle(int3 angles);
 
     // Simulator debug
@@ -63,13 +66,15 @@ public:
     // Current pose
     float3 poseAngles;
 
+    RobotLeg** robotlegs;
 private:
 
-    RobotLeg** robotlegs;
     int numLegs;
 
     // Posição dos ombros no corpo
     LegConfig config[MAX_LEGS];
+
+    void (*roarCallback)() = nullptr;
 
 };
 

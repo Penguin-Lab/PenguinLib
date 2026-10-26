@@ -32,6 +32,14 @@ floatxyz Rotation3d(floatxyz point, int3 angles){
     return rotPoint;
 }
 
+floatxyz Translation3d(floatxyz point, floatxyz dxyz){
+    floatxyz transPoint;
+    transPoint.x = point.x + dxyz.x;
+    transPoint.y = point.y + dxyz.y;
+    transPoint.z = point.z + dxyz.z;
+    return transPoint;
+}
+
 LeggedRobot::LeggedRobot(RobotLeg** robotlegs, LegConfig* config, int numLegs) {
     this->robotlegs = robotlegs;
     this->numLegs = numLegs;
@@ -56,7 +64,7 @@ RobotLeg* LeggedRobot::robotleg(int index) {
 // =====================================================
 
 void LeggedRobot::start(){
-    int totalPoints = 100;
+    int totalPoints = 4000;
     int halfPoints = totalPoints/2;
     floatxyz xyzStart[MAX_LEGS];
     
@@ -88,7 +96,7 @@ void LeggedRobot::start(){
             this->sendAngles(k);
         #endif
         k++;
-        delay(20);
+        delayMicroseconds((int)(20*100*1000/totalPoints));
     }
     delay(1000);
     
@@ -112,12 +120,12 @@ void LeggedRobot::start(){
             this->sendAngles(k);
         #endif           
         k++;
-        delay(20);
+        delayMicroseconds((int)(20*100*1000/totalPoints));
     }
 }
 
 void LeggedRobot::shutdown(){
-    int totalPoints = 100;
+    int totalPoints = 4000;
     int halfPoints = totalPoints/2;
     floatxyz xyzStart[MAX_LEGS];
 
@@ -146,7 +154,7 @@ void LeggedRobot::shutdown(){
             this->sendAngles(k);
         #endif           
         k++;
-        delay(20);
+        delayMicroseconds((int)(20*100*1000/totalPoints));
     }
     delay(1000);
     
@@ -174,7 +182,7 @@ void LeggedRobot::shutdown(){
             this->sendAngles(k);
         #endif           
         k++;
-        delay(20);
+        delayMicroseconds((int)(20*100*1000/totalPoints));
     }
 
     // Shutdown legs
@@ -205,6 +213,7 @@ int LeggedRobot::walk(int k, float angle_rad){
     }
 }
 
+// Conferir pois parece que y e x estao trocados (sin e cos) e sinal de dalpha esquisito
 floatxyz LeggedRobot::circularTrajetory(floatxyz footPosition, floatxyz currentPosition, float stepLength, float totalAngle_rad, LegConfig config){
     // Translation of foot position to body coordinates
     floatxyz xyz = coordLegToBody(footPosition, config.installedAngle_rad, config.coxa);
@@ -267,10 +276,10 @@ int LeggedRobot::circularWalk(int k, float angle) {
         w_mult = percentual;
         v_mult = 1.0 - percentual;
     }
-    Serial.print("w: ");
-    Serial.println(w_mult);
-    Serial.print("v: ");
-    Serial.println(v_mult);
+    // Serial.print("w: ");
+    // Serial.println(w_mult);
+    // Serial.print("v: ");
+    // Serial.println(v_mult);
 
     // Calculate and combine linear and circular tranjectory movement
     int3 angles[MAX_LEGS];
@@ -457,15 +466,93 @@ void LeggedRobot::highHandShake(int k, int legIdx, int3 angles, int totalPoints)
     robotlegs[legIdx]->move(anglesHand.coxa, anglesHand.femur, anglesHand.tibia);
 }
 
+void LeggedRobot::roar(int3 angles, int legIdx){
+    // Reaction to body tilt
+    int3 anglesRot = angles*(-1);
+    
+    int3 anglesReact[MAX_LEGS];
+    for (int i = 0; i < numLegs; i++) {
+        // Translation of foot position to body coordinates
+        floatxyz xyzBody = coordLegToBody(robotlegs[i]->footPosition, config[i].installedAngle_rad, config[i].coxa);
+        // Apply rotation for reaction
+        floatxyz xyzBodyRot = Rotation3d(xyzBody,anglesRot);
+        xyzBodyRot = Translation3d(xyzBodyRot,{5.0f,0.0f,2.0f});
+        // Rotation and translation from body back to leg coordinates
+        floatxyz xyzLeg = coordBodyToLeg(xyzBodyRot, config[i].installedAngle_rad, config[i].coxa);
+        anglesReact[i] = robotlegs[i]->inverseKinematics(xyzLeg);
+    }
+
+    // Move softly
+    bool done = false;
+    while(!done){
+        done = true;
+        for (int i = 0; i < numLegs; i++) {
+            done &= robotlegs[i]->moveSoft(anglesReact[i].coxa, anglesReact[i].femur, anglesReact[i].tibia, 1);
+        }
+    }
+    // Store idle react position
+    floatxyz idlePosition = robotlegs[legIdx]->directKinematics(robotlegs[legIdx]->angles);
+
+    delay(2000);
+
+    // Call this external function so the robot can roar (cry)
+    if (roarCallback != nullptr) {
+        roarCallback();
+    }
+
+    // Move the right front leg
+    int totalPoints = 100;
+    int halfPoints = totalPoints/2;
+    // Leg displacement on body coordinates
+    float dx = 1;
+    float dy = 0;
+    float dz = 10;
+
+    // Change to leg coordinates
+    floatxyz dxdydzLeg = coordBodyToLeg(floatxyz{dx, dy, dz}, config[legIdx].installedAngle_rad, floatxyz{0.0f, 0.0f, 0.0f});
+    int k = 0;
+    while(k < halfPoints){
+        floatxyz xyz = robotlegs[legIdx]->legBezierTrajetory(idlePosition, k, 0, dxdydzLeg.x, dxdydzLeg.y, dxdydzLeg.z, totalPoints);
+        int3 anglesHand = robotlegs[legIdx]->inverseKinematics(xyz);
+        // Move the leg
+        robotlegs[legIdx]->move(anglesHand.coxa, anglesHand.femur, anglesHand.tibia);
+        k++;
+        delay(20);
+    }
+
+    // Moving back to idle position
+    k = 0;
+    floatxyz currentPosition = robotlegs[legIdx]->directKinematics(robotlegs[legIdx]->angles);
+    floatxyz dxdydzLegFinal = idlePosition - currentPosition;
+    while(k < halfPoints){
+        floatxyz xyz = robotlegs[legIdx]->legBezierTrajetory(currentPosition, k, 0, dxdydzLegFinal.x, dxdydzLegFinal.y, dxdydzLegFinal.z, totalPoints);
+        int3 anglesHand = robotlegs[legIdx]->inverseKinematics(xyz);
+        // Move the leg
+        robotlegs[legIdx]->move(anglesHand.coxa, anglesHand.femur, anglesHand.tibia);
+        k++;
+        delay(20);
+    }
+
+    delay(2000);
+    this->idle();
+
+}
+
+void LeggedRobot::setRoarCallback(void (*callback)()) {
+    roarCallback = callback;
+}
+
 // =====================================================
 // Stop command
 // =====================================================
 
-void LeggedRobot::idle(){
+bool LeggedRobot::idle(){
     // Move legs to idle position
+    bool done = true;
     for (int i = 0; i < numLegs; i++) {
-        robotlegs[i]->moveToInitialPosition();
+        done &= robotlegs[i]->moveToInitialPosition();
     }
+    return done;
 }
 
 void LeggedRobot::idle(int3 angles){ // Same as bodyTilt but moving softly

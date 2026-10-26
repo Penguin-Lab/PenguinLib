@@ -31,13 +31,13 @@ public:
     );
 
     // Classes constants
-    static constexpr int TOTAL_POINTS = 25;
+    static constexpr int TOTAL_POINTS = 26;
     static constexpr int HALF_POINTS = TOTAL_POINTS / 2;
 
     // Servo control
     void move(int angCoxa, int angFemur, int angTibia);
     bool moveSoft(int angCoxa, int angFemur, int angTibia, int step);
-    void moveToInitialPosition();
+    bool moveToInitialPosition();
     void shutdown();
 
     // Kinematics
@@ -65,14 +65,15 @@ public:
     float P1[2];
     float P2[2];
     float P3[2];
-
+    float stepHeight = 5.0f;
+    
+    int3 LIMMIN;
+    int3 LIMMAX;
 private:
 
     Adafruit_PWMServoDriver* pwm;
 
     int3 pins;
-    int3 LIMMIN;
-    int3 LIMMAX;
 };
 
 #endif

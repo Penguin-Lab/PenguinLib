@@ -348,11 +348,10 @@ void comMqtt::callback(char* topic, byte* payload, unsigned int length){
     char messageChar[length + 1];
     memcpy(messageChar, payload, length);
     messageChar[length] = '\0';
-
     if (strcmp(topic, topicVel) == 0) {
         message = String(messageChar);
-        Serial.print("Received message: ");
-        Serial.println(message);
+        // Serial.print("Received message: ");
+        // Serial.println(message);
 
         int separator = message.indexOf(',');
         if (separator != -1) {
@@ -434,7 +433,7 @@ JoystickData comDabble::getJoystick(){
         joystickData.mode = 1;
       }
       // Omnidirectional walk mode
-      if (GamePad.isUpPressed()||GamePad.isDownPressed()){
+      if (GamePad.isUpPressed()){
         joystickData.mode = 0;
       }
       // Tilt reaction with IMU mode
@@ -448,6 +447,10 @@ JoystickData comDabble::getJoystick(){
       // Wiggle while pressing
       else if(GamePad.isTrianglePressed()){
         joystickData.state = 2;
+      }
+      // Roar
+      else if (GamePad.isDownPressed()){
+        joystickData.state = 4;
       }
       // Walk
       else if(joystickData.velocity > 2){
