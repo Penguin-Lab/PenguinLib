@@ -11,21 +11,21 @@ Adafruit_PWMServoDriver pwmL = Adafruit_PWMServoDriver(0x40);
 Adafruit_PWMServoDriver pwmR = Adafruit_PWMServoDriver(0x41);
 
 // Criacao das patas e do hexapod
-RobotLeg LeftFoward    = {&pwmL, 12, 13, 14, 341, 819, 336, 810, 162, -326, L1, L2, L3};
-RobotLeg LeftMiddle    = {&pwmL,  4,  5,  6, 356, 844, 347, 817, 149, -313, L1, L2, L3};
-RobotLeg LeftBackward  = {&pwmL,  0,  1,  2, 346, 816, 348, 814, 162, -320, L1, L2, L3};
+RobotLeg LeftFoward    = {&pwmL, 12, 13, 14, 341, 819, 336, 795, 157, -320, L1, L2, L3};
+RobotLeg LeftMiddle    = {&pwmL,  4,  5,  6, 356, 844, 335, 814, 147, -313, L1, L2, L3};
+RobotLeg LeftBackward  = {&pwmL,  0,  1,  2, 346, 816, 349, 796, 162, -320, L1, L2, L3};
 
-RobotLeg RightFoward   = {&pwmR,  3,  2,  1, 315, 747, 332, -96, 495, 923, L1, L2, L3};
-RobotLeg RightMiddle   = {&pwmR, 11, 10,  9, 327, 761, 338, -92, 526, 956, L1, L2, L3};
-RobotLeg RightBackward = {&pwmR, 15, 14, 13, 335, 769, 341, -87, 524, 956, L1, L2, L3};
+RobotLeg RightFoward   = {&pwmR,  3,  2,  1, 315, 747, 326, -104, 496, 920, L1, L2, L3};
+RobotLeg RightMiddle   = {&pwmR, 11, 10,  9, 327, 761, 348, -86, 522, 934, L1, L2, L3};
+RobotLeg RightBackward = {&pwmR, 15, 14, 13, 335, 769, 343, -83, 530, 960, L1, L2, L3};
 
-LegConfig LeftFowardConfig    = {floatxyz{9.30,5.55,0.00}, int3{-45,26,-100}, 0, 0};
-LegConfig LeftMiddleConfig    = {floatxyz{0.00,6.50,0.00}, int3{  0,26,-100}, RobotLeg::HALF_POINTS, 0};
-LegConfig LeftBackwardConfig  = {floatxyz{-9.5,5.50,0.00}, int3{ 45,26,-100}, 0, 0};
+LegConfig LeftFowardConfig    = {floatxyz{9.30,7.05,0.00}, int3{-45,26,-100}, 0, 0};
+LegConfig LeftMiddleConfig    = {floatxyz{0.00,8.00,0.00}, int3{  0,26,-100}, RobotLeg::HALF_POINTS, 0};
+LegConfig LeftBackwardConfig  = {floatxyz{-9.5,7.00,0.00}, int3{ 45,26,-100}, 0, 0};
 
-LegConfig RightFowardConfig   = {floatxyz{9.30,-5.55,0.0}, int3{225,26,-100}, RobotLeg::HALF_POINTS, M_PI};
-LegConfig RightMiddleConfig   = {floatxyz{0.00,-6.50,0.0}, int3{180,26,-100}, 0, M_PI};
-LegConfig RightBackwardConfig = {floatxyz{-9.5,-5.50,0.0}, int3{135,26,-100}, RobotLeg::HALF_POINTS, M_PI};
+LegConfig RightFowardConfig   = {floatxyz{9.30,-7.05,0.0}, int3{225,26,-100}, RobotLeg::HALF_POINTS, M_PI};
+LegConfig RightMiddleConfig   = {floatxyz{0.00,-8.00,0.0}, int3{180,26,-100}, 0, M_PI};
+LegConfig RightBackwardConfig = {floatxyz{-9.5,-7.00,0.0}, int3{135,26,-100}, RobotLeg::HALF_POINTS, M_PI};
 
 RobotLeg* hexapodLegs[6] = {&LeftFoward, &LeftMiddle, &LeftBackward, &RightFoward, &RightMiddle, &RightBackward};
 LegConfig hexapodConfigs[6] = {LeftFowardConfig, LeftMiddleConfig, LeftBackwardConfig, RightFowardConfig, RightMiddleConfig, RightBackwardConfig};
